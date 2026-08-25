@@ -94,7 +94,14 @@ export default function FormTaoHoSo({ nhanVien, dsPhuong, dsThuTuc, dsNhanVien }
       if (!kq) {
         setBaoQr({
           loai: "luu",
-          chu: "Chưa thấy mã QR. Mã nằm ở mặt trước hoặc mặt sau tùy đời thẻ — thử chọn nốt ảnh mặt còn lại, hoặc chụp lại rõ hơn. Không có mã thì nhập tay bên dưới cũng được.",
+          chu: "Chưa thấy mã QR. Chụp lại theo cách này thì đọc được: đặt thẻ nằm phẳng, chụp thẳng từ trên xuống, để thẻ chiếm gần hết khung hình, tránh ánh sáng lóa vào mã. Không đọc được thì nhập tay bên dưới cũng xong.",
+        });
+        return;
+      }
+      if (!kq.duLieu) {
+        setBaoQr({
+          loai: "luu",
+          chu: "Đọc được một mã QR nhưng nội dung không phải dữ liệu căn cước. Kiểm lại xem có chọn nhầm ảnh không, hoặc nhập tay bên dưới.",
         });
         return;
       }
