@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabaseClient";
 import { docSo, chiSo, dinhDangTien } from "@/lib/money";
 import { doQrTrongCacAnh, lamSachTenTep } from "@/lib/cccd";
 import QuetQrCamera from "@/components/QuetQrCamera";
+import OTimNganh from "@/components/OTimNganh";
 
 const MUC_VON = [30, 50, 100, 200, 500, 1000].map((tr) => ({
   nhan: tr >= 1000 ? `${tr / 1000} tỷ` : `${tr} tr`,
@@ -39,7 +40,7 @@ function OThaAnh({ nhan, mo_ta, tep, khiChon }) {
   );
 }
 
-export default function FormTaoHoSo({ nhanVien, dsPhuong, dsThuTuc, dsNhanVien }) {
+export default function FormTaoHoSo({ nhanVien, dsPhuong, dsThuTuc, dsNhanVien, dsNganhNghe = [] }) {
   const router = useRouter();
   const supabase = createClient();
 
@@ -402,15 +403,34 @@ export default function FormTaoHoSo({ nhanVien, dsPhuong, dsThuTuc, dsNhanVien }
 
       <section className="the">
         <div className="buoc"><span className="so">04</span><h2>Ngành nghề</h2></div>
-        <p className="ghi">Ngành đầu tiên là ngành chính.</p>
-        <div className="luoi">
-          <div className="o"><label>Mã ngành</label>
-            <input className="ma" value={maNganh} list="dsNganh"
-              onChange={(e) => setMaNganh(e.target.value)} placeholder="4711" /></div>
-          <div className="o"><label>Tên ngành</label>
-            <input value={tenNganh} onChange={(e) => setTenNganh(e.target.value)} /></div>
+        <p className="ghi">Gõ vài chữ trong tên ngành là ra gợi ý — không cần gõ đúng dấu. Ngành đầu tiên là ngành chính.</p>
+        <div className="o">
+          <OTimNganh
+            danhMuc={dsNganhNghe}
+            khiChon={(n) => {
+              if (nganh.some((x) => x.ma === n.ma)) {
+                setBaoNganh({ loai: "loi", chu: `Mã ${n.ma} đã có trong danh sách.` });
+                return;
+              }
+              setNganh((cu) => [...cu, n]);
+              setBaoNganh(null);
+            }}
+          />
         </div>
-        <button type="button" className="nut phu2 nho" onClick={themNganh}>Thêm ngành</button>
+
+        <details style={{ marginBottom: 10 }}>
+          <summary style={{ fontSize: 12, color: "var(--nhat)", cursor: "pointer" }}>
+            Ngành không có trong danh mục — nhập tay
+          </summary>
+          <div className="luoi" style={{ marginTop: 10 }}>
+            <div className="o"><label>Mã ngành</label>
+              <input className="ma" value={maNganh}
+                onChange={(e) => setMaNganh(e.target.value)} placeholder="4711" /></div>
+            <div className="o"><label>Tên ngành</label>
+              <input value={tenNganh} onChange={(e) => setTenNganh(e.target.value)} /></div>
+          </div>
+          <button type="button" className="nut phu2 nho" onClick={themNganh}>Thêm ngành</button>
+        </details>
         {baoNganh && <div className={`bao ${baoNganh.loai}`}>{baoNganh.chu}</div>}
 
         {nganh.length > 0 && (
