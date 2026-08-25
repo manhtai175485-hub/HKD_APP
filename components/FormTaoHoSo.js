@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import jsQR from "jsqr";
 import { createClient } from "@/lib/supabaseClient";
 import { docSo, chiSo, dinhDangTien } from "@/lib/money";
-import { tachChuoiQr, anhSangDiemAnh, lamSachTenTep } from "@/lib/cccd";
+import { doQrTrongCacAnh, lamSachTenTep } from "@/lib/cccd";
 
 const MUC_VON = [30, 50, 100, 200, 500, 1000].map((tr) => ({
   nhan: tr >= 1000 ? `${tr / 1000} tỷ` : `${tr} tr`,
@@ -84,29 +84,21 @@ export default function FormTaoHoSo({ nhanVien, dsPhuong, dsThuTuc, dsNhanVien }
     });
   }
 
-  async function xuLyAnhSau(tep) {
-    setAnhSau(tep);
+  // Dò mã QR trong CẢ HAI ảnh. Vị trí mã khác nhau tùy đời thẻ:
+  // thẻ cấp khoảng 2021 để QR ở mặt trước, thẻ đời sau để ở mặt sau.
+  async function doQr(truoc, sau) {
+    if (!truoc && !sau) return;
     setBaoQr({ loai: "luu", chu: "Đang dò mã QR…" });
     try {
-      const diemAnh = await anhSangDiemAnh(tep);
-      const kq = jsQR(diemAnh.data, diemAnh.width, diemAnh.height, {
-        inversionAttempts: "attemptBoth",
-      });
+      const kq = await doQrTrongCacAnh(jsQR, [sau, truoc]);
       if (!kq) {
         setBaoQr({
           loai: "luu",
-          chu: "Không thấy mã QR trong ảnh. Chụp lại rõ hơn, lấy trọn mặt sau thẻ — hoặc nhập tay thông tin chủ hộ bên dưới.",
+          chu: "Chưa thấy mã QR. Mã nằm ở mặt trước hoặc mặt sau tùy đời thẻ — thử chọn nốt ảnh mặt còn lại, hoặc chụp lại rõ hơn. Không có mã thì nhập tay bên dưới cũng được.",
         });
         return;
       }
-      const d = tachChuoiQr(kq.data);
-      if (!d) {
-        setBaoQr({
-          loai: "luu",
-          chu: "Đọc được mã QR nhưng nội dung không đúng dạng căn cước. Nhập tay thông tin chủ hộ bên dưới.",
-        });
-        return;
-      }
+      const d = kq.duLieu;
       setF((cu) => {
         const moi = {
           ...cu,
@@ -128,6 +120,16 @@ export default function FormTaoHoSo({ nhanVien, dsPhuong, dsThuTuc, dsNhanVien }
     } catch (e) {
       setBaoQr({ loai: "loi", chu: "Không đọc được ảnh: " + e.message });
     }
+  }
+
+  function chonAnhTruoc(tep) {
+    setAnhTruoc(tep);
+    doQr(tep, anhSau);
+  }
+
+  function chonAnhSau(tep) {
+    setAnhSau(tep);
+    doQr(anhTruoc, tep);
   }
 
   function themNganh() {
@@ -253,10 +255,10 @@ export default function FormTaoHoSo({ nhanVien, dsPhuong, dsThuTuc, dsNhanVien }
 
       <section className="the">
         <div className="buoc"><span className="so">01</span><h2>Ảnh căn cước công dân</h2></div>
-        <p className="ghi">Chọn ảnh hai mặt. Mã QR ở mặt sau sẽ tự điền thông tin chủ hộ.</p>
+        <p className="ghi">Chọn ảnh hai mặt. Mã QR trên thẻ sẽ tự điền thông tin chủ hộ.</p>
         <div className="luoi">
-          <OThaAnh nhan="Mặt trước" mo_ta="Mặt có ảnh chân dung" tep={anhTruoc} khiChon={setAnhTruoc} />
-          <OThaAnh nhan="Mặt sau" mo_ta="Mặt có mã QR" tep={anhSau} khiChon={xuLyAnhSau} />
+          <OThaAnh nhan="Mặt trước" mo_ta="Mặt có ảnh chân dung" tep={anhTruoc} khiChon={chonAnhTruoc} />
+          <OThaAnh nhan="Mặt sau" mo_ta="Mặt có vân tay và chip" tep={anhSau} khiChon={chonAnhSau} />
         </div>
         {baoQr && <div className={`bao ${baoQr.loai}`}>{baoQr.chu}</div>}
       </section>
