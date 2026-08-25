@@ -6,6 +6,7 @@ import jsQR from "jsqr";
 import { createClient } from "@/lib/supabaseClient";
 import { docSo, chiSo, dinhDangTien } from "@/lib/money";
 import { doQrTrongCacAnh, lamSachTenTep } from "@/lib/cccd";
+import QuetQrCamera from "@/components/QuetQrCamera";
 
 const MUC_VON = [30, 50, 100, 200, 500, 1000].map((tr) => ({
   nhan: tr >= 1000 ? `${tr / 1000} tỷ` : `${tr} tr`,
@@ -45,6 +46,7 @@ export default function FormTaoHoSo({ nhanVien, dsPhuong, dsThuTuc, dsNhanVien }
   const [anhTruoc, setAnhTruoc] = useState(null);
   const [anhSau, setAnhSau] = useState(null);
   const [baoQr, setBaoQr] = useState(null);
+  const [moCamera, setMoCamera] = useState(false);
 
   const [f, setF] = useState({
     code: "",
@@ -105,8 +107,14 @@ export default function FormTaoHoSo({ nhanVien, dsPhuong, dsThuTuc, dsNhanVien }
         });
         return;
       }
-      const d = kq.duLieu;
-      setF((cu) => {
+      dienThongTin(kq.duLieu);
+    } catch (e) {
+      setBaoQr({ loai: "loi", chu: "Không đọc được ảnh: " + e.message });
+    }
+  }
+
+  function dienThongTin(d) {
+    setF((cu) => {
         const moi = {
           ...cu,
           owner_cccd: d.cccd,
@@ -120,13 +128,10 @@ export default function FormTaoHoSo({ nhanVien, dsPhuong, dsThuTuc, dsNhanVien }
         }
         return moi;
       });
-      setBaoQr({
-        loai: "ok",
-        chu: `Đã điền thông tin của ${d.hoTen}. Đối chiếu lại với thẻ trước khi lưu.`,
-      });
-    } catch (e) {
-      setBaoQr({ loai: "loi", chu: "Không đọc được ảnh: " + e.message });
-    }
+    setBaoQr({
+      loai: "ok",
+      chu: `Đã điền thông tin của ${d.hoTen}. Đối chiếu lại với thẻ trước khi lưu.`,
+    });
   }
 
   function chonAnhTruoc(tep) {
@@ -267,7 +272,23 @@ export default function FormTaoHoSo({ nhanVien, dsPhuong, dsThuTuc, dsNhanVien }
           <OThaAnh nhan="Mặt trước" mo_ta="Mặt có ảnh chân dung" tep={anhTruoc} khiChon={chonAnhTruoc} />
           <OThaAnh nhan="Mặt sau" mo_ta="Mặt có vân tay và chip" tep={anhSau} khiChon={chonAnhSau} />
         </div>
+        <div style={{ marginTop: 14, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <button type="button" className="nut phu2 nho" onClick={() => setMoCamera(true)}>
+            Quét mã bằng camera
+          </button>
+          <span className="phu" style={{ fontSize: 12 }}>
+            Chắc ăn hơn quét từ ảnh — thử liên tục cho tới khi bắt được mã.
+          </span>
+        </div>
+
         {baoQr && <div className={`bao ${baoQr.loai}`}>{baoQr.chu}</div>}
+
+        {moCamera && (
+          <QuetQrCamera
+            khiDong={() => setMoCamera(false)}
+            khiXong={(d) => { setMoCamera(false); dienThongTin(d); }}
+          />
+        )}
       </section>
 
       <section className="the">
