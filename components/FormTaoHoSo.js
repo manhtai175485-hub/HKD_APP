@@ -40,6 +40,21 @@ function OThaAnh({ nhan, mo_ta, tep, khiChon }) {
   );
 }
 
+// Sinh mã hồ sơ: HKD-260825-K3F  (ngày tạo + ba ký tự ngẫu nhiên).
+// Nhân viên không phải nghĩ mã, mà vẫn không đụng nhau khi hai người
+// tạo cùng lúc. Trùng thì lưu sẽ báo lỗi và app sinh lại mã khác.
+function sinhMaHoSo() {
+  const d = new Date();
+  const p2 = (n) => String(n).padStart(2, "0");
+  const ngay = `${String(d.getFullYear()).slice(2)}${p2(d.getMonth() + 1)}${p2(d.getDate())}`;
+  const chuSo = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // bỏ chữ dễ nhìn nhầm: I O 0 1
+  let duoi = "";
+  for (let i = 0; i < 3; i++) {
+    duoi += chuSo[Math.floor(Math.random() * chuSo.length)];
+  }
+  return `HKD-${ngay}-${duoi}`;
+}
+
 export default function FormTaoHoSo({ nhanVien, dsPhuong, dsThuTuc, dsNhanVien, dsNganhNghe = [] }) {
   const router = useRouter();
   const supabase = createClient();
@@ -51,7 +66,6 @@ export default function FormTaoHoSo({ nhanVien, dsPhuong, dsThuTuc, dsNhanVien, 
   const [dangDocAnh, setDangDocAnh] = useState(false);
 
   const [f, setF] = useState({
-    code: "",
     procedure_code: dsThuTuc[0]?.code || "THANH_LAP",
     assigned_to: nhanVien.id,
     authorized_to: nhanVien.id,
@@ -201,7 +215,6 @@ export default function FormTaoHoSo({ nhanVien, dsPhuong, dsThuTuc, dsNhanVien, 
 
   function thieuGi() {
     const can = [
-      ["code", "Mã hồ sơ"],
       ["owner_name", "Họ tên chủ hộ"],
       ["owner_cccd", "Số căn cước"],
       ["business_name", "Tên hộ kinh doanh"],
@@ -231,13 +244,14 @@ export default function FormTaoHoSo({ nhanVien, dsPhuong, dsThuTuc, dsNhanVien, 
     setBaoLuu({ loai: "luu", chu: "Đang lưu…" });
     try {
       const von = Number(chiSo(f.capital)) || 0;
-      const truoc = await taiAnh(anhTruoc, f.code.trim(), "cccd-truoc");
-      const sau = await taiAnh(anhSau, f.code.trim(), "cccd-sau");
+      const ma = sinhMaHoSo();
+      const truoc = await taiAnh(anhTruoc, ma, "cccd-truoc");
+      const sau = await taiAnh(anhSau, ma, "cccd-sau");
 
       const { data: hoSo, error: loiHoSo } = await supabase
         .from("hkd_dossiers")
         .insert({
-          code: f.code.trim(),
+          code: ma,
           procedure_code: f.procedure_code,
           assigned_to: f.assigned_to,
           authorized_to: f.authorized_to,
@@ -260,7 +274,13 @@ export default function FormTaoHoSo({ nhanVien, dsPhuong, dsThuTuc, dsNhanVien, 
         .select("id")
         .single();
 
-      if (loiHoSo) throw new Error(loiHoSo.message);
+      if (loiHoSo) {
+        // Mã trùng — hiếm, nhưng có thể xảy ra khi hai người lưu cùng lúc
+        if (String(loiHoSo.message).includes("duplicate")) {
+          throw new Error("Mã hồ sơ vừa sinh bị trùng. Bấm Lưu hồ sơ lần nữa, app sẽ sinh mã khác.");
+        }
+        throw new Error(loiHoSo.message);
+      }
 
       if (nganh.length) {
         // Bổ sung mã ngành chưa có trong danh mục để khóa ngoại không vướng
@@ -356,9 +376,7 @@ export default function FormTaoHoSo({ nhanVien, dsPhuong, dsThuTuc, dsNhanVien, 
         <div className="buoc"><span className="so">03</span><h2>Hộ kinh doanh</h2></div>
         <p className="ghi">Tên hộ được gợi ý từ họ tên và năm sinh — sửa lại nếu cần.</p>
         <div className="luoi">
-          <div className="o"><label>Mã hồ sơ</label>
-            <input className="ma" value={f.code} onChange={(e) => dat("code", e.target.value)} placeholder="HKD-001" /></div>
-          <div className="o"><label>Loại thủ tục</label>
+          <div className="o rong"><label>Loại thủ tục</label>
             <select value={f.procedure_code} onChange={(e) => dat("procedure_code", e.target.value)}>
               {dsThuTuc.map((t) => <option key={t.code} value={t.code}>{t.name}</option>)}
             </select></div>
