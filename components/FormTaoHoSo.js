@@ -47,6 +47,7 @@ export default function FormTaoHoSo({ nhanVien, dsPhuong, dsThuTuc, dsNhanVien }
   const [anhSau, setAnhSau] = useState(null);
   const [baoQr, setBaoQr] = useState(null);
   const [moCamera, setMoCamera] = useState(false);
+  const [dangDocAnh, setDangDocAnh] = useState(false);
 
   const [f, setF] = useState({
     code: "",
@@ -110,6 +111,42 @@ export default function FormTaoHoSo({ nhanVien, dsPhuong, dsThuTuc, dsNhanVien }
       dienThongTin(kq.duLieu);
     } catch (e) {
       setBaoQr({ loai: "loi", chu: "Không đọc được ảnh: " + e.message });
+    }
+  }
+
+  // Gửi ảnh lên máy chủ để mô hình đọc chữ trên thẻ.
+  // Dùng khi mã QR không dò được — chịu được ảnh nghiêng, lóa, mờ.
+  async function docBangAnh() {
+    if (!anhTruoc && !anhSau) {
+      setBaoQr({ loai: "loi", chu: "Chọn ít nhất một ảnh trước đã." });
+      return;
+    }
+    setDangDocAnh(true);
+    setBaoQr({ loai: "luu", chu: "Đang đọc thẻ… mất chừng năm tới mười giây." });
+    try {
+      const goi = new FormData();
+      if (anhTruoc) goi.append("truoc", anhTruoc);
+      if (anhSau) goi.append("sau", anhSau);
+
+      const traLoi = await fetch("/api/doc-cccd", { method: "POST", body: goi });
+      const kq = await traLoi.json();
+
+      if (!traLoi.ok) {
+        setBaoQr({ loai: "loi", chu: kq.error || "Không đọc được thẻ." });
+        return;
+      }
+      if (!kq.cccd && !kq.hoTen) {
+        setBaoQr({
+          loai: "luu",
+          chu: "Không đọc ra được thông tin nào. Chụp lại rõ hơn hoặc nhập tay bên dưới.",
+        });
+        return;
+      }
+      dienThongTin(kq);
+    } catch (e) {
+      setBaoQr({ loai: "loi", chu: "Lỗi kết nối: " + e.message });
+    } finally {
+      setDangDocAnh(false);
     }
   }
 
@@ -273,11 +310,14 @@ export default function FormTaoHoSo({ nhanVien, dsPhuong, dsThuTuc, dsNhanVien }
           <OThaAnh nhan="Mặt sau" mo_ta="Mặt có vân tay và chip" tep={anhSau} khiChon={chonAnhSau} />
         </div>
         <div style={{ marginTop: 14, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <button type="button" className="nut nho" onClick={docBangAnh} disabled={dangDocAnh}>
+            {dangDocAnh ? "Đang đọc…" : "Đọc thẻ từ ảnh"}
+          </button>
           <button type="button" className="nut phu2 nho" onClick={() => setMoCamera(true)}>
             Quét mã bằng camera
           </button>
           <span className="phu" style={{ fontSize: 12 }}>
-            Chắc ăn hơn quét từ ảnh — thử liên tục cho tới khi bắt được mã.
+            Đọc từ ảnh chịu được ảnh nghiêng và lóa. Quét mã nhanh hơn nhưng cần ảnh sắc nét.
           </span>
         </div>
 
