@@ -120,26 +120,45 @@ async function goiGemini(dsAnh) {
   }
   phan.push({ text: "Đọc thẻ căn cước trong các ảnh trên." });
 
-  const url =
-    "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" +
-    encodeURIComponent(process.env.GEMINI_API_KEY);
+  // Google đổi tên mô hình khá thường xuyên và khóa các bản cũ với người
+  // dùng mới. Thử lần lượt vài tên, tên nào chạy thì dùng — khỏi phải sửa
+  // mã mỗi lần Google đổi.
+  const MO_HINH = [
+    "gemini-3.6-flash",
+    "gemini-3-flash",
+    "gemini-2.5-flash",
+    "gemini-flash-latest",
+  ];
 
-  const traLoi = await fetch(url, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      system_instruction: { parts: [{ text: HUONG_DAN }] },
-      contents: [{ role: "user", parts: phan }],
-      generationConfig: { responseMimeType: "application/json", maxOutputTokens: 1024 },
-    }),
-  });
+  let loiCuoi = "";
+  for (const ten of MO_HINH) {
+    const url =
+      `https://generativelanguage.googleapis.com/v1beta/models/${ten}:generateContent?key=` +
+      encodeURIComponent(process.env.GEMINI_API_KEY);
 
-  if (!traLoi.ok) {
-    throw new Error(`Google trả lỗi ${traLoi.status}: ${(await traLoi.text()).slice(0, 300)}`);
+    const traLoi = await fetch(url, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        system_instruction: { parts: [{ text: HUONG_DAN }] },
+        contents: [{ role: "user", parts: phan }],
+        generationConfig: { responseMimeType: "application/json", maxOutputTokens: 1024 },
+      }),
+    });
+
+    if (traLoi.ok) {
+      const data = await traLoi.json();
+      const parts = data?.candidates?.[0]?.content?.parts || [];
+      return parts.map((p) => p.text || "").join("");
+    }
+
+    const chiTiet = (await traLoi.text()).slice(0, 300);
+    loiCuoi = `Google trả lỗi ${traLoi.status} với ${ten}: ${chiTiet}`;
+    // 404 nghĩa là tên mô hình không dùng được — thử tên tiếp theo.
+    // Lỗi khác (khóa sai, hết hạn mức) thì dừng luôn, thử nữa cũng vậy.
+    if (traLoi.status !== 404) break;
   }
-  const data = await traLoi.json();
-  const parts = data?.candidates?.[0]?.content?.parts || [];
-  return parts.map((p) => p.text || "").join("");
+  throw new Error(loiCuoi || "Không gọi được mô hình nào của Google");
 }
 
 export async function POST(request) {
